@@ -1,0 +1,500 @@
+openapi: 3.0.3
+
+info:
+  title: API Sistema de Gestion de Proyectos y Tareas
+  description: >
+    Contrato de la API REST del proyecto de Ingenieria Web II.
+    Autenticacion mediante JWT (Bearer token).
+  version: 1.0.0
+
+servers:
+  - url: http://127.0.0.1:5000
+    description: Servidor local de desarrollo
+
+tags:
+  - name: Health
+    description: Verificacion del estado del servicio
+  - name: Auth
+    description: Registro e inicio de sesion
+  - name: Usuarios
+    description: Gestion de usuarios
+  - name: Proyectos
+    description: Gestion de proyectos
+  - name: Tareas
+    description: Gestion de tareas
+
+paths:
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Estado del servicio
+      security: []
+      responses:
+        "200":
+          description: El servicio esta operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrar un nuevo usuario
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistroRequest"
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "400":
+          $ref: "#/components/responses/ErrorValidacion"
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesion y obtener un JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Autenticacion correcta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+                  usuario:
+                    $ref: "#/components/schemas/Usuario"
+        "401":
+          $ref: "#/components/responses/NoAutorizado"
+
+  /api/usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Listar usuarios
+      responses:
+        "200":
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Usuario"
+        "401":
+          $ref: "#/components/responses/NoAutorizado"
+
+  /api/usuarios/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Usuarios]
+      summary: Obtener un usuario
+      responses:
+        "200":
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    put:
+      tags: [Usuarios]
+      summary: Actualizar un usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                rol:
+                  type: string
+                  example: usuario
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    delete:
+      tags: [Usuarios]
+      summary: Eliminar un usuario
+      responses:
+        "200":
+          $ref: "#/components/responses/Mensaje"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /api/proyectos:
+    get:
+      tags: [Proyectos]
+      summary: Listar proyectos
+      responses:
+        "200":
+          description: Lista de proyectos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Proyecto"
+        "401":
+          $ref: "#/components/responses/NoAutorizado"
+    post:
+      tags: [Proyectos]
+      summary: Crear un proyecto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre]
+              properties:
+                nombre:
+                  type: string
+                  example: Plataforma web
+                descripcion:
+                  type: string
+                  example: Proyecto de la asignatura
+                propietario_id:
+                  type: integer
+                  example: 1
+      responses:
+        "201":
+          description: Proyecto creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proyecto"
+        "400":
+          $ref: "#/components/responses/ErrorValidacion"
+
+  /api/proyectos/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Proyectos]
+      summary: Obtener un proyecto
+      responses:
+        "200":
+          description: Proyecto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proyecto"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    put:
+      tags: [Proyectos]
+      summary: Actualizar un proyecto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                descripcion:
+                  type: string
+      responses:
+        "200":
+          description: Proyecto actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proyecto"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    delete:
+      tags: [Proyectos]
+      summary: Eliminar un proyecto
+      responses:
+        "200":
+          $ref: "#/components/responses/Mensaje"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /api/tareas:
+    get:
+      tags: [Tareas]
+      summary: Listar tareas
+      responses:
+        "200":
+          description: Lista de tareas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tarea"
+        "401":
+          $ref: "#/components/responses/NoAutorizado"
+    post:
+      tags: [Tareas]
+      summary: Crear una tarea
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titulo, proyecto_id]
+              properties:
+                titulo:
+                  type: string
+                  example: Disenar la base de datos
+                descripcion:
+                  type: string
+                estado:
+                  type: string
+                  example: pendiente
+                proyecto_id:
+                  type: integer
+                  example: 1
+                asignado_a:
+                  type: integer
+                  example: 1
+      responses:
+        "201":
+          description: Tarea creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tarea"
+        "400":
+          $ref: "#/components/responses/ErrorValidacion"
+
+  /api/tareas/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Tareas]
+      summary: Obtener una tarea
+      responses:
+        "200":
+          description: Tarea encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tarea"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    put:
+      tags: [Tareas]
+      summary: Actualizar una tarea
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                titulo:
+                  type: string
+                descripcion:
+                  type: string
+                estado:
+                  type: string
+                asignado_a:
+                  type: integer
+      responses:
+        "200":
+          description: Tarea actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tarea"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    delete:
+      tags: [Tareas]
+      summary: Eliminar una tarea
+      responses:
+        "200":
+          $ref: "#/components/responses/Mensaje"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Identificador del recurso
+
+  schemas:
+
+    Usuario:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: Nicolas
+        email:
+          type: string
+          format: email
+          example: nicolas@umb.edu.co
+        rol:
+          type: string
+          example: usuario
+
+    RegistroRequest:
+      type: object
+      required: [nombre, email, password]
+      properties:
+        nombre:
+          type: string
+          example: Nicolas
+        email:
+          type: string
+          format: email
+          example: nicolas@umb.edu.co
+        password:
+          type: string
+          format: password
+          example: secreta123
+        rol:
+          type: string
+          example: usuario
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: nicolas@umb.edu.co
+        password:
+          type: string
+          format: password
+          example: secreta123
+
+    Proyecto:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: Plataforma web
+        descripcion:
+          type: string
+          example: Proyecto de la asignatura
+        propietario_id:
+          type: integer
+          example: 1
+
+    Tarea:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        titulo:
+          type: string
+          example: Disenar la base de datos
+        descripcion:
+          type: string
+        estado:
+          type: string
+          example: pendiente
+        proyecto_id:
+          type: integer
+          example: 1
+        asignado_a:
+          type: integer
+          example: 1
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Recurso no encontrado
+
+  responses:
+
+    ErrorValidacion:
+      description: Datos invalidos
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NoAutorizado:
+      description: Token ausente o invalido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NoEncontrado:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Mensaje:
+      description: Operacion realizada
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              mensaje:
+                type: string
+                example: Recurso eliminado
+
+security:
+  - bearerAuth: []

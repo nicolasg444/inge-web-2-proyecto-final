@@ -1,0 +1,10 @@
+/* Reset minimo. Los estilos de la aplicacion estan en App.css */
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
