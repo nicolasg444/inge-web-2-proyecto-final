@@ -2,6 +2,7 @@
 
 from flask import Blueprint, request, jsonify
 
+from app import cache
 from app.services import project_service
 from app.utils.jwt_utils import token_required
 
@@ -12,7 +13,8 @@ projects_bp = Blueprint("projects", __name__)
 @projects_bp.route("/", methods=["GET"])
 @token_required
 def listar():
-    return jsonify(project_service.listar()), 200
+    # Listado global cacheado en Redis (ver app/cache.py).
+    return cache.listado_cacheado("proyectos", project_service.listar)
 
 
 @projects_bp.route("/<int:project_id>", methods=["GET"])
@@ -36,6 +38,7 @@ def crear():
             data.get("descripcion"),
             data.get("propietario_id", propietario),
         )
+        cache.invalidar("proyectos", "tareas")
         return jsonify(proyecto), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -49,6 +52,7 @@ def actualizar(project_id):
         proyecto = project_service.actualizar(
             project_id, data.get("nombre"), data.get("descripcion")
         )
+        cache.invalidar("proyectos", "tareas")
         return jsonify(proyecto), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
@@ -59,6 +63,7 @@ def actualizar(project_id):
 def eliminar(project_id):
     try:
         project_service.eliminar(project_id)
+        cache.invalidar("proyectos", "tareas")
         return jsonify({"mensaje": "Proyecto eliminado"}), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 404

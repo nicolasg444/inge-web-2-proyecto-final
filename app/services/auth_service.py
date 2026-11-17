@@ -6,6 +6,8 @@ from app.utils.jwt_utils import generate_token
 
 
 def register(nombre, email, password, rol="usuario"):
+    # La ruta publica /register nunca pasa "rol"; el parametro existe solo
+    # para scripts internos (p. ej. crear el primer admin).
     if not nombre or not email or not password:
         raise ValueError("nombre, email y password son obligatorios")
 

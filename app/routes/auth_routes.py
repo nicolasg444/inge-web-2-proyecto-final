@@ -11,11 +11,13 @@ auth_bp = Blueprint("auth", __name__)
 def register():
     data = request.get_json(silent=True) or {}
     try:
+        # El rol NO se toma del cuerpo de la peticion: antes cualquiera podia
+        # registrarse como "admin". Todo registro publico es "usuario"; un
+        # admin existente puede promover a otro con PUT /api/usuarios/<id>.
         usuario = auth_service.register(
             data.get("nombre"),
             data.get("email"),
             data.get("password"),
-            data.get("rol", "usuario"),
         )
         return jsonify(usuario), 201
     except ValueError as e:
