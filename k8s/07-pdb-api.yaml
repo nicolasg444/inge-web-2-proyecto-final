@@ -1,0 +1,19 @@
+# PodDisruptionBudget: durante interrupciones VOLUNTARIAS (kubectl drain,
+# actualizacion de nodos en AKS) Kubernetes no desaloja un pod de la API si
+# con eso quedarian menos de 2 disponibles. Con 3 replicas, se desaloja de
+# a uno y se espera a que su reemplazo este listo.
+# No protege de fallos INVOLUNTARIOS (un nodo que se apaga de golpe): para
+# eso estan las replicas repartidas entre nodos.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api
+  namespace: ingweb
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: ingweb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api

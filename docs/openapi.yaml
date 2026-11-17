@@ -10,6 +10,10 @@ info:
 servers:
   - url: http://127.0.0.1:5000
     description: Servidor local de desarrollo
+  - url: http://localhost:8080
+    description: Docker Compose (via Nginx)
+  - url: http://localhost:8081
+    description: Kubernetes kind (via Nginx, NodePort 30080)
 
 tags:
   - name: Health
@@ -41,6 +45,30 @@ paths:
                   status:
                     type: string
                     example: ok
+                  estado:
+                    type: string
+                    example: ok
+
+  /quien:
+    get:
+      tags: [Health]
+      summary: Contenedor/pod que respondio y version desplegada
+      description: Demuestra el balanceo entre replicas y el rolling update.
+      security: []
+      responses:
+        "200":
+          description: Identidad del contenedor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pod:
+                    type: string
+                    example: api-7fb64946f7-cbfhs
+                  version:
+                    type: string
+                    example: "1.0"
 
   /api/auth/register:
     post:
@@ -124,6 +152,9 @@ paths:
     put:
       tags: [Usuarios]
       summary: Actualizar un usuario
+      description: >
+        Solo el propio usuario o un admin. Solo un admin puede cambiar "rol".
+        Los campos omitidos conservan su valor.
       requestBody:
         required: true
         content:
@@ -146,14 +177,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Usuario"
+        "403":
+          description: No es el propio usuario ni admin, o intenta cambiar el rol sin ser admin
         "404":
           $ref: "#/components/responses/NoEncontrado"
     delete:
       tags: [Usuarios]
       summary: Eliminar un usuario
+      description: Solo el propio usuario o un admin.
       responses:
         "200":
           $ref: "#/components/responses/Mensaje"
+        "403":
+          description: No es el propio usuario ni admin
         "404":
           $ref: "#/components/responses/NoEncontrado"
 
@@ -401,9 +437,9 @@ components:
           type: string
           format: password
           example: secreta123
-        rol:
-          type: string
-          example: usuario
+      description: >
+        El rol NO se acepta en el registro publico: todo usuario nuevo es
+        "usuario" (un campo "rol" enviado se ignora).
 
     LoginRequest:
       type: object

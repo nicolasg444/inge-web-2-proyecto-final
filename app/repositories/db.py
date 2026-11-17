@@ -13,6 +13,8 @@ def get_connection(use_database=True):
         "port": Config.DB_PORT,
         "user": Config.DB_USER,
         "password": Config.DB_PASSWORD,
+        # Sin timeout, una base de datos caida dejaria colgado al worker.
+        "connection_timeout": 5,
     }
 
     if use_database:

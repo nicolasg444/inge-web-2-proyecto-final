@@ -1,0 +1,19 @@
+# compose.override.yaml - SOLO DESARROLLO.
+# "docker compose up" lo aplica automaticamente encima de compose.yaml.
+# Para el modo produccion se excluye con: docker compose -f compose.yaml up -d
+
+services:
+  api:
+    # El codigo se monta desde el equipo (bind mount, solo lectura para el
+    # contenedor) y Gunicorn se reinicia al detectar cambios: no hace falta
+    # reconstruir la imagen en cada edicion.
+    volumes:
+      - ./app:/app/app:ro
+    command: ["gunicorn", "-c", "gunicorn.conf.py", "--reload", "run:app"]
+    # --reload escribe estado y es mas comodo sin restricciones en desarrollo.
+    read_only: false
+    environment:
+      LOG_LEVEL: debug
+    # Acceso directo a la API (sin Nginx) solo desde el propio equipo.
+    ports:
+      - "127.0.0.1:8000:8000"

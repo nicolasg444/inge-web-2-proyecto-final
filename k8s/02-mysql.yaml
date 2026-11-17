@@ -1,0 +1,151 @@
+# MySQL: base de datos de la aplicacion dentro del cluster.
+# StatefulSet (y no Deployment) porque tiene identidad estable (mysql-0) y
+# un volumen persistente propio que sobrevive a la recreacion del pod.
+# 1 replica: MySQL no se replica solo; varias replicas sobre volumenes
+# distintos serian bases de datos distintas. En Azure se reemplaza por
+# Azure Database for MySQL (PaaS con alta disponibilidad gestionada).
+---
+# Service "headless" (clusterIP: None): el DNS "mysql" apunta directo al
+# pod. Es lo que exige un StatefulSet (serviceName). Mismo nombre que en
+# Compose, asi la API usa DB_HOST=mysql en ambos entornos.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: ingweb
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/part-of: ingweb
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: ingweb
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/part-of: ingweb
+    app.kubernetes.io/component: database
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mysql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mysql
+        app.kubernetes.io/part-of: ingweb
+        app.kubernetes.io/component: database
+    spec:
+      # Sin token de ServiceAccount: estas apps no hablan con la API de
+      # Kubernetes, y un token montado es una credencial que un atacante
+      # podria robar. Ademas, el token se monta en /var/run/secrets/... y
+      # chocaria con nuestro volumen de solo lectura en /run/secrets.
+      automountServiceAccountToken: false
+      # Sin variables de "service links": por cada Service, Kubernetes
+      # inyecta variables estilo Docker links (REDIS_PORT=tcp://10.96.x.x:6379)
+      # que pisan nuestra configuracion (REDIS_PORT debe ser "6379"). Los
+      # Services se encuentran por DNS (redis, mysql, api).
+      enableServiceLinks: false
+      # Usuario mysql de la imagen (UID/GID 999) desde el arranque, sin
+      # pasar por root. fsGroup hace legibles los secretos para el grupo.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      # MySQL necesita tiempo para vaciar buffers a disco al apagarse.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: mysql
+          image: mysql:8.4.7
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYSQL_DATABASE
+              value: ingenieria_web
+            - name: MYSQL_USER
+              value: ingweb
+            # *_FILE: la imagen lee la contrasena del archivo montado.
+            - name: MYSQL_PASSWORD_FILE
+              value: /run/secrets/db_password
+            - name: MYSQL_ROOT_PASSWORD_FILE
+              value: /run/secrets/mysql_root_password
+          ports:
+            - name: mysql
+              containerPort: 3306
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          # Primer arranque: inicializa el volumen (puede tardar ~1 min).
+          startupProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: datos
+              mountPath: /var/lib/mysql
+            - name: secretos
+              mountPath: /run/secrets
+              readOnly: true
+            # Raiz de solo lectura: el socket y los temporales necesitan
+            # directorios escribibles propios.
+            - name: socket
+              mountPath: /var/run/mysqld
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: secretos
+          secret:
+            secretName: ingweb-secretos
+            # Solo las dos claves que usa MySQL (minimo privilegio).
+            items:
+              - key: db_password
+                path: db_password
+              - key: mysql_root_password
+                path: mysql_root_password
+            defaultMode: 0440
+        - name: socket
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+  # Un PVC por replica, creado automaticamente (en kind lo provee el
+  # StorageClass "standard" local-path). Sobrevive al borrado del pod.
+  volumeClaimTemplates:
+    - metadata:
+        name: datos
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

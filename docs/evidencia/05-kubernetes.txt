@@ -1,0 +1,64 @@
+# kubectl get deploy,rs,statefulset,pods,svc,pdb -o wide
+# Generado: 2026-11-17 00:22:27
+
+NAME                    READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES               SELECTOR
+deployment.apps/api     3/3     3            3           11m   api          ingweb-api:1.1       app.kubernetes.io/name=api
+deployment.apps/redis   1/1     1            1           11m   redis        redis:7.4.6-alpine   app.kubernetes.io/name=redis
+deployment.apps/web     2/2     2            2           11m   web          ingweb-web:1.0       app.kubernetes.io/name=web
+
+NAME                              DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES               SELECTOR
+replicaset.apps/api-79fd55586f    0         0         0       11m   api          ingweb-api:1.0       app.kubernetes.io/name=api,pod-template-hash=79fd55586f
+replicaset.apps/api-7fb64946f7    3         3         3       10m   api          ingweb-api:1.1       app.kubernetes.io/name=api,pod-template-hash=7fb64946f7
+replicaset.apps/redis-57d6d9654   1         1         1       11m   redis        redis:7.4.6-alpine   app.kubernetes.io/name=redis,pod-template-hash=57d6d9654
+replicaset.apps/web-f84c9f8f4     2         2         2       11m   web          ingweb-web:1.0       app.kubernetes.io/name=web,pod-template-hash=f84c9f8f4
+
+NAME                     READY   AGE   CONTAINERS   IMAGES
+statefulset.apps/mysql   1/1     11m   mysql        mysql:8.4.7
+
+NAME                        READY   STATUS    RESTARTS   AGE     IP            NODE            NOMINATED NODE   READINESS GATES
+pod/api-7fb64946f7-cbfhs    1/1     Running   0          9m4s    10.244.1.8    ingweb-worker   <none>           <none>
+pod/api-7fb64946f7-cjnh2    1/1     Running   0          8m23s   10.244.1.12   ingweb-worker   <none>           <none>
+pod/api-7fb64946f7-hfzlm    1/1     Running   0          8m33s   10.244.1.11   ingweb-worker   <none>           <none>
+pod/mysql-0                 1/1     Running   0          11m     10.244.1.5    ingweb-worker   <none>           <none>
+pod/redis-57d6d9654-97zhm   1/1     Running   0          8m33s   10.244.1.9    ingweb-worker   <none>           <none>
+pod/web-f84c9f8f4-44r9t     1/1     Running   0          8m33s   10.244.1.10   ingweb-worker   <none>           <none>
+pod/web-f84c9f8f4-jjr26     1/1     Running   0          11m     10.244.1.4    ingweb-worker   <none>           <none>
+
+NAME            TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/api     ClusterIP   10.96.179.228   <none>        8000/TCP         11m   app.kubernetes.io/name=api
+service/mysql   ClusterIP   None            <none>        3306/TCP         11m   app.kubernetes.io/name=mysql
+service/redis   ClusterIP   10.96.205.253   <none>        6379/TCP         11m   app.kubernetes.io/name=redis
+service/web     NodePort    10.96.105.247   <none>        8080:30080/TCP   11m   app.kubernetes.io/name=web
+
+NAME                             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+poddisruptionbudget.policy/api   2               N/A               1                     11m
+
+## Clase QoS por pod
+POD                     QOS         NODO
+api-7fb64946f7-cbfhs    Burstable   ingweb-worker
+api-7fb64946f7-cjnh2    Burstable   ingweb-worker
+api-7fb64946f7-hfzlm    Burstable   ingweb-worker
+mysql-0                 Burstable   ingweb-worker
+redis-57d6d9654-97zhm   Burstable   ingweb-worker
+web-f84c9f8f4-44r9t     Burstable   ingweb-worker
+web-f84c9f8f4-jjr26     Burstable   ingweb-worker
+
+## Historial de despliegues de la API
+deployment.apps/api 
+REVISION  CHANGE-CAUSE
+3         <none>
+4         <none>
+
+
+## Secret: describe muestra solo claves y tamanos, nunca valores
+Data
+====
+db_password:          48 bytes
+jwt_secret:           64 bytes
+mysql_root_password:  48 bytes
+redis_password:       48 bytes
+
+## Variables de los pods de la API (solo rutas *_FILE)
+JWT_SECRET_FILE=/run/secrets/jwt_secret
+DB_PASSWORD_FILE=/run/secrets/db_password
+REDIS_PASSWORD_FILE=/run/secrets/redis_password

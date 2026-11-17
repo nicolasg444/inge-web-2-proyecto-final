@@ -1,0 +1,125 @@
+# Web: Nginx sin privilegios que sirve React y reenvia /api a la API.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: ingweb
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: ingweb
+    app.kubernetes.io/component: frontend
+spec:
+  # 2 replicas: si una cae (o se actualiza) la otra sigue sirviendo.
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+        app.kubernetes.io/part-of: ingweb
+        app.kubernetes.io/component: frontend
+    spec:
+      # Sin token de ServiceAccount: estas apps no hablan con la API de
+      # Kubernetes, y un token montado es una credencial que un atacante
+      # podria robar. Ademas, el token se monta en /var/run/secrets/... y
+      # chocaria con nuestro volumen de solo lectura en /run/secrets.
+      automountServiceAccountToken: false
+      # Sin variables de "service links": por cada Service, Kubernetes
+      # inyecta variables estilo Docker links (REDIS_PORT=tcp://10.96.x.x:6379)
+      # que pisan nuestra configuracion (REDIS_PORT debe ser "6379"). Los
+      # Services se encuentran por DNS (redis, mysql, api).
+      enableServiceLinks: false
+      # Usuario nginx de la imagen nginx-unprivileged (UID/GID 101).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: web
+          matchLabelKeys:
+            - pod-template-hash
+      containers:
+        - name: web
+          image: ingweb-web:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          # readOnlyRootFilesystem SI funciona: la imagen unprivileged ya
+          # escribe pid y temporales en /tmp, que aqui es un emptyDir. Los
+          # scripts de /docker-entrypoint.d solo avisan que no pueden editar
+          # la configuracion (no lo necesitamos).
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # Nginx usa un worker por CPU del nodo (worker_processes auto);
+          # 128Mi da margen en nodos con muchos nucleos.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          # /salud-web no depende de la API: si la API cae, la web no se
+          # reinicia (seguiria fallando igual).
+          readinessProbe:
+            httpGet:
+              path: /salud-web
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /salud-web
+              port: http
+            periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+# NodePort 30080: abre el puerto en todos los nodos; kind lo publica en
+# 127.0.0.1:8081 del anfitrion (k8s/kind/kind-ingweb.yaml).
+# En produccion seria type: LoadBalancer (IP publica de Azure) o, mejor, un
+# Ingress detras de Azure Front Door + WAF.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: ingweb
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: ingweb
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30080

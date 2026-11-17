@@ -28,3 +28,14 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Secretos y configuracion local (NUNCA versionar)
+.env.*
+!.env.example
+secrets/
+.smoke.env
+*.pem
+*.key
+
+# Datos locales y evidencia cruda temporal
+data/

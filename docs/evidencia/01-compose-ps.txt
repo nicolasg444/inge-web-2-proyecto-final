@@ -1,0 +1,9 @@
+# docker compose ps
+# Generado: 2026-11-17 00:22:16
+
+NAME                IMAGE                                                                     COMMAND                  SERVICE    CREATED          STATUS                     PORTS
+ingweb-api-1        sha256:ee4f7f2b0ccec0e123cc3db91a2ee8bb0378bb01438ab17169177c3af94850dd   "gunicorn -c gunicor…"   api        5 minutes ago    Up 5 minutes (healthy)     8000/tcp
+ingweb-api-init-1   sha256:ee4f7f2b0ccec0e123cc3db91a2ee8bb0378bb01438ab17169177c3af94850dd   "python init_db.py"      api-init   5 minutes ago    Exited (0) 5 minutes ago   
+ingweb-mysql-1      mysql:8.4.7                                                               "docker-entrypoint.s…"   mysql      35 minutes ago   Up 35 minutes (healthy)    3306/tcp, 33060/tcp
+ingweb-redis-1      redis:7.4.6-alpine                                                        "docker-entrypoint.s…"   redis      35 minutes ago   Up 35 minutes (healthy)    6379/tcp
+ingweb-web-1        ingweb-web:1.0                                                            "/docker-entrypoint.…"   web        5 minutes ago    Up 5 minutes (healthy)     0.0.0.0:8085->8080/tcp, [::]:8085->8080/tcp

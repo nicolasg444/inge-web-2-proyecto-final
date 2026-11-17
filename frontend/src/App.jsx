@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { getHealth, API_URL } from './api'
+import { getHealth, getQuien, API_URL } from './api'
 import './App.css'
 
 function App() {
   const [estado, setEstado] = useState(null)
   const [error, setError] = useState(null)
   const [cargando, setCargando] = useState(true)
+  const [quien, setQuien] = useState(null)
 
   // Consulta el endpoint /health del backend Flask
   const consultar = () => {
@@ -16,6 +17,11 @@ function App() {
       .then((datos) => setEstado(datos.status))
       .catch((e) => setError(e.message))
       .finally(() => setCargando(false))
+
+    // Contenedor/pod que respondio (demuestra el balanceo entre replicas)
+    getQuien()
+      .then(setQuien)
+      .catch(() => setQuien(null))
   }
 
   useEffect(() => {
@@ -48,8 +54,15 @@ function App() {
 
         <div className="tarjeta__fila">
           <span className="etiqueta">API</span>
-          <code className="url">{API_URL}</code>
+          <code className="url">{API_URL || window.location.origin}</code>
         </div>
+
+        {quien && (
+          <div className="tarjeta__fila">
+            <span className="etiqueta">GET /quien</span>
+            <code className="url">{quien.pod} &middot; v{quien.version}</code>
+          </div>
+        )}
 
         {error && <p className="mensaje-error">{error}</p>}
 

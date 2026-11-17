@@ -1,0 +1,201 @@
+# API Flask (Gunicorn): 3 replicas sin estado.
+# Se puede escalar porque no guarda nada en memoria entre peticiones: el JWT
+# se verifica con JWT_SECRET (identico en todas las replicas, sale del mismo
+# Secret), los datos viven en MySQL y la cache en Redis.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: ingweb
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: ingweb
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 3
+  # Cuantas versiones anteriores se guardan para "kubectl rollout undo".
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Nunca bajar de 3 pods listos durante una actualizacion...
+      maxUnavailable: 0
+      # ...creando de a 1 pod nuevo extra (4 como maximo temporal).
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api
+        app.kubernetes.io/part-of: ingweb
+        app.kubernetes.io/component: backend
+    spec:
+      # Sin token de ServiceAccount: estas apps no hablan con la API de
+      # Kubernetes, y un token montado es una credencial que un atacante
+      # podria robar. Ademas, el token se monta en /var/run/secrets/... y
+      # chocaria con nuestro volumen de solo lectura en /run/secrets.
+      automountServiceAccountToken: false
+      # Sin variables de "service links": por cada Service, Kubernetes
+      # inyecta variables estilo Docker links (REDIS_PORT=tcp://10.96.x.x:6379)
+      # que pisan nuestra configuracion (REDIS_PORT debe ser "6379"). Los
+      # Services se encuentran por DNS (redis, mysql, api).
+      enableServiceLinks: false
+      # Mismo UID/GID que el usuario "app" de la imagen. Kubernetes rechaza
+      # el pod si la imagen intentara correr como root.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        # Los archivos del Secret montado quedan con este grupo (0440):
+        # legibles por la app y por nadie mas.
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # Tiempo maximo entre SIGTERM y SIGKILL. Cubre preStop (5 s) +
+      # graceful_timeout de Gunicorn (20 s).
+      terminationGracePeriodSeconds: 30
+      # Repartir las replicas entre nodos: si cae un worker no caen todas.
+      # ScheduleAnyway: es una preferencia; con un solo nodo igual programa.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+          # Calcula el reparto por version (ReplicaSet): durante un rolling
+          # update los pods viejos no distorsionan el reparto de los nuevos.
+          matchLabelKeys:
+            - pod-template-hash
+      # Crea las tablas antes de arrancar la API (idempotente:
+      # CREATE ... IF NOT EXISTS). Reintenta mientras MySQL no responda.
+      initContainers:
+        - name: init-db
+          image: ingweb-api:1.0
+          imagePullPolicy: IfNotPresent
+          command: ["python", "init_db.py"]
+          # "&entorno" es un ancla YAML: el contenedor api la reutiliza con
+          # "*entorno" para que ambos tengan exactamente la misma config.
+          env: &entorno
+            - name: DB_HOST
+              value: mysql
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_NAME
+              value: ingenieria_web
+            - name: DB_USER
+              value: ingweb
+            - name: REDIS_HOST
+              value: redis
+            - name: CACHE_TTL
+              value: "30"
+            - name: JWT_EXP_HOURS
+              value: "8"
+            # Secretos: solo rutas; los valores estan en el volumen.
+            - name: JWT_SECRET_FILE
+              value: /run/secrets/jwt_secret
+            - name: DB_PASSWORD_FILE
+              value: /run/secrets/db_password
+            - name: REDIS_PASSWORD_FILE
+              value: /run/secrets/redis_password
+            # APP_VERSION NO se define aqui a proposito: viene de la imagen
+            # (ENV del Dockerfile, --build-arg APP_VERSION). Si se fijara
+            # aqui, "kubectl set image ... ingweb-api:1.1" seguiria
+            # reportando 1.0 en /quien.
+          securityContext: &seguridad
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          volumeMounts: &montajes
+            - name: secretos
+              mountPath: /run/secrets
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: api
+          image: ingweb-api:1.0
+          # kind: la imagen se carga con "kind load docker-image" y no existe
+          # en ningun registro. Con "Always" intentaria descargarla y fallaria.
+          imagePullPolicy: IfNotPresent
+          env: *entorno
+          ports:
+            # Nombre del puerto: el Service apunta a "http", no a 8000.
+            - name: http
+              containerPort: 8000
+          securityContext: *seguridad
+          # Punto de partida: Gunicorn con 2 workers ronda 100-150 Mi (ver
+          # "kubectl top pod" si se instala metrics-server y ajustar).
+          # requests = lo que el scheduler reserva; limits = techo
+          # (la CPU se frena; si se pasa de memoria, OOMKilled).
+          # requests != limits => QoS Burstable (ver DECISIONES.md).
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # startupProbe: mientras no pase, no corren las otras. Da hasta
+          # 60 s para arrancar sin que la liveness lo mate antes.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          # readiness: si falla, el pod sale del Service (no recibe trafico)
+          # pero NO se reinicia.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 2
+          # liveness: si falla, se reinicia el contenedor. /health NUNCA
+          # consulta MySQL ni Redis: si lo hiciera, una caida de MySQL
+          # reiniciaria las 3 replicas en bucle sin arreglar nada.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            # Al borrar un pod, Kubernetes envia SIGTERM y en paralelo lo
+            # quita de los Endpoints del Service. Esperar 5 s deja que
+            # kube-proxy deje de enviarle trafico ANTES de que Gunicorn
+            # cierre; sin esto, algunas peticiones caen durante el rollout.
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          volumeMounts: *montajes
+      volumes:
+        - name: secretos
+          secret:
+            secretName: ingweb-secretos
+            # Solo las claves que usa la API (no mysql_root_password).
+            items:
+              - key: jwt_secret
+                path: jwt_secret
+              - key: db_password
+                path: db_password
+              - key: redis_password
+                path: redis_password
+            defaultMode: 0440
+        # /tmp escribible (latido de los workers de Gunicorn) en un
+        # sistema de archivos raiz de solo lectura.
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi

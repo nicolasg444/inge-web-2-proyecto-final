@@ -14,10 +14,18 @@ def obtener(user_id):
     return usuario
 
 
-def actualizar(user_id, nombre, email, rol):
-    if not user_repository.get_by_id(user_id):
+def actualizar(user_id, nombre, email, rol=None):
+    actual = user_repository.get_by_id(user_id)
+    if not actual:
         raise ValueError("Usuario no encontrado")
-    user_repository.update(user_id, nombre, email, rol)
+    # Campos omitidos conservan su valor (antes un PUT sin "rol" degradaba
+    # a un admin a "usuario" y uno sin "nombre" lo dejaba en NULL).
+    user_repository.update(
+        user_id,
+        nombre or actual["nombre"],
+        email or actual["email"],
+        rol or actual["rol"],
+    )
     return user_repository.get_by_id(user_id)
 
 
