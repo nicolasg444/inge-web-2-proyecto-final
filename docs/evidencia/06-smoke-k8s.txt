@@ -1,0 +1,68 @@
+# smoke-jwt.mjs contra http://localhost:8081 (k8s)
+# Generado: 2026-11-17 00:22:28
+
+Smoke test de seguridad contra http://localhost:8081
+
+1. Endpoints publicos
+  ✔ GET /health -> 200 {"estado":"ok"}
+  ✔ GET /quien responde; pods distintos en 12 llamadas: 3
+    api-7fb64946f7-hfzlm (v1.1), api-7fb64946f7-cjnh2 (v1.1), api-7fb64946f7-cbfhs (v1.1)
+
+2. Sin credenciales
+  ✔ POST /api/proyectos sin token -> 401
+  ✔ GET /api/proyectos sin token -> 401
+
+3. Flujo completo: registro -> login -> escritura con JWT
+  ✔ POST /api/auth/register -> 201
+  ✔ el registro ignora "rol": admin enviado por el cliente
+  ✔ POST /api/auth/login -> 200 con token
+  ✔ POST /api/proyectos con Authorization -> 201
+
+4. Autorizacion (identidad tomada del JWT, no del cuerpo)
+  ✔ un usuario no puede subirse a admin -> 403
+  ✔ un usuario no puede borrar a otro -> 403
+  - OMITIDA: CSRF: la API autentica con "Authorization: Bearer" (no cookies); ver DECISIONES.md
+
+5. JWT manipulados
+  ✔ firma alterada -> 401
+  ✔ payload alterado (rol admin) con firma original -> 401
+  ✔ alg "none" -> 401
+  ✔ token mal formado -> 401
+
+6. JWT expirado
+  ✔ token bien firmado pero vencido -> 401 "Token expirado"
+
+7. XSS almacenado se devuelve como texto
+  ✔ el payload se guarda y devuelve literal (sin interpretar)
+  ✔ Content-Type: application/json (no text/html)
+  ✔ X-Content-Type-Options: nosniff en la respuesta
+
+8. Cabeceras de seguridad (HTML via Nginx y API via Flask)
+  ✔ HTML /: Content-Security-Policy
+  ✔ HTML /: X-Content-Type-Options
+  ✔ HTML /: X-Frame-Options (sin duplicar)
+  ✔ HTML /: una sola CSP
+  ✔ HTML /: Server sin version
+  ✔ API /api/proyectos: Content-Security-Policy
+  ✔ API /api/proyectos: X-Content-Type-Options
+  ✔ API /api/proyectos: X-Frame-Options (sin duplicar)
+  ✔ API /api/proyectos: una sola CSP
+  ✔ API /api/proyectos: Server sin version
+  ✔ API /health: Content-Security-Policy
+  ✔ API /health: X-Content-Type-Options
+  ✔ API /health: X-Frame-Options (sin duplicar)
+  ✔ API /health: una sola CSP
+  ✔ API /health: Server sin version
+
+9. Cache Redis (informativo)
+  ✔ listado: HIT -> HIT (segunda lectura desde Redis)
+  ✔ una escritura invalida la cache (siguiente lectura MISS)
+  ✔ el listado incluye el proyecto recien creado
+
+10. Limpieza
+  ✔ DELETE /api/proyectos/4
+  ✔ DELETE /api/proyectos/5
+  ✔ DELETE /api/proyectos/6
+  ✔ borra el usuario desechable
+
+Resultado: TODO EN VERDE (1 omitida(s))

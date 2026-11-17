@@ -1,0 +1,9 @@
+# docker image ls (imagenes del proyecto)
+# Generado: 2026-11-17 00:22:17
+
+REPOSITORY:TAG                            SIZE      CREATED
+ingweb-api:ingenua                        1.83GB    About a minute ago
+ingweb-api:1.1                            349MB     31 minutes ago
+ingweb-api:1.0                            349MB     35 minutes ago
+ingweb-web:1.0                            81.9MB    43 minutes ago
+ingweb-api:test                           383MB     44 minutes ago
