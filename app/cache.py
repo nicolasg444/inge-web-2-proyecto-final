@@ -15,6 +15,8 @@
 """
 
 import logging
+import socket
+import threading
 import time
 
 import redis
@@ -31,14 +33,47 @@ _cliente = None
 _pausa_hasta = 0.0
 
 
+def _resolver(host, limite=0.5):
+    """Resuelve el nombre con limite de tiempo.
+
+    socket_connect_timeout no cubre la resolucion DNS: con el contenedor de
+    Redis detenido, getaddrinfo("redis") puede tardar varios segundos en una
+    red "internal" de Docker. Se resuelve en un hilo y se abandona a tiempo.
+    """
+    resultado = {}
+
+    def tarea():
+        try:
+            resultado["ip"] = socket.getaddrinfo(
+                host, None, socket.AF_INET, socket.SOCK_STREAM
+            )[0][4][0]
+        except OSError as error:
+            resultado["error"] = error
+
+    hilo = threading.Thread(target=tarea, daemon=True)
+    hilo.start()
+    hilo.join(limite)
+    if "ip" not in resultado:
+        raise redis.ConnectionError("resolucion DNS fallida o lenta")
+    return resultado["ip"]
+
+
 def _obtener_cliente():
     """Cliente perezoso; None si la cache esta desactivada o en pausa."""
     global _cliente
     if not Config.REDIS_HOST or time.monotonic() < _pausa_hasta:
         return None
     if _cliente is None:
+        try:
+            ip = _resolver(Config.REDIS_HOST)
+        except redis.ConnectionError as error:
+            _registrar_fallo("conexion", error)
+            return None
+        # Se conecta a la IP resuelta; si Redis cambia de IP (contenedor o
+        # pod recreado) la conexion falla, el cliente se descarta y en el
+        # siguiente intento se vuelve a resolver el nombre.
         _cliente = redis.Redis(
-            host=Config.REDIS_HOST,
+            host=ip,
             port=Config.REDIS_PORT,
             password=Config.REDIS_PASSWORD,
             # Timeouts cortos: una cache lenta es peor que no tener cache.
@@ -50,8 +85,10 @@ def _obtener_cliente():
 
 
 def _registrar_fallo(operacion, error):
-    global _pausa_hasta
+    global _pausa_hasta, _cliente
     _pausa_hasta = time.monotonic() + _PAUSA_TRAS_FALLO
+    # Descarta el cliente para volver a resolver el nombre al reintentar.
+    _cliente = None
     # Solo el tipo de error: el mensaje podria incluir host/credenciales.
     log.warning(
         "Redis no disponible en %s (%s); se usa MySQL directamente",
