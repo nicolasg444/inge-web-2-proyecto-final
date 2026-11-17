@@ -1,0 +1,46 @@
+# .dockerignore de la API (contexto = raiz del repo).
+# Todo lo que no esta aqui viaja al daemon de Docker en cada build y puede
+# terminar dentro de la imagen con COPY. Regla: excluir por defecto lo
+# sensible, lo pesado y lo que no necesita la API.
+
+# Control de versiones (historial completo, podria contener secretos viejos)
+.git
+.gitignore
+
+# Secretos y configuracion local: NUNCA dentro de una imagen
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+.smoke.env
+**/*service-account*.json
+**/*credentials*.json
+
+# Entornos y caches de Python (se reconstruyen dentro de la imagen)
+.venv/
+venv/
+env/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Otras partes del repo que la imagen de la API no necesita
+frontend/
+k8s/
+docs/
+scripts/
+compose*.yaml
+README.md
+DECISIONES.md
+
+# Datos locales y logs
+data/
+*.log
+logs/
+
+# Dockerfiles: cambiarlos no debe invalidar la capa del codigo
+Dockerfile*

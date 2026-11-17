@@ -1,0 +1,8 @@
+# MATERIAL DE LABORATORIO. BuildKit usa este archivo (en lugar de
+# .dockerignore) cuando se construye con -f Dockerfile.ingenuo.
+# Casi vacio a proposito para mostrar el costo de no filtrar el contexto;
+# solo se excluyen credenciales REALES para no copiarlas a una imagen.
+.env
+secrets/
+.smoke.env
+.venv/

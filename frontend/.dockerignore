@@ -1,0 +1,13 @@
+# .dockerignore del frontend (contexto = frontend/)
+# node_modules se reinstala dentro de la imagen con npm ci (binarios para
+# Linux/musl, no los de Windows del equipo de desarrollo).
+node_modules/
+dist/
+.vite/
+# .env local (apunta a 127.0.0.1:5000); en la imagen se usa mismo origen.
+.env
+.env.*
+*.log
+.git
+Dockerfile*
+README.md

@@ -1,0 +1,32 @@
+# =============================================================================
+#  MATERIAL DE LABORATORIO - NO USAR EN PRODUCCION
+#  Dockerfile "ingenuo" a proposito, solo para compararlo con el Dockerfile
+#  optimizado (scripts/medir-imagenes.sh). Cada linea comete un error comun.
+# =============================================================================
+
+# ERROR: ":latest" cambia sin aviso; el build de hoy y el de manana difieren.
+# Ademas es la imagen completa (con compiladores), no "slim".
+FROM python:latest
+
+WORKDIR /app
+
+# ERROR: copiar TODO antes de instalar dependencias. Cualquier cambio en
+# cualquier archivo invalida la cache y obliga a reinstalar todo.
+# (Usa Dockerfile.ingenuo.dockerignore, casi vacio: entra node_modules,
+# frontend, docs... Excluye secrets/ y .env solo para no meter credenciales
+# REALES del equipo en una imagen local durante la practica.)
+COPY . .
+
+RUN pip install -r requirements-dev.txt
+
+# ERROR: secreto en ENV. Queda grabado en la imagen y se ve con
+# "docker history --no-trunc" y "docker inspect". Valor FALSO de ejemplo.
+ENV JWT_SECRET="secreto-de-ejemplo-NO-USAR-0123456789abcdef" \
+    DB_PASSWORD="secreto-de-ejemplo-NO-USAR"
+
+# ERROR: no hay USER -> corre como root.
+EXPOSE 5000
+
+# ERROR: forma shell -> /bin/sh es el PID 1 y no reenvia SIGTERM; ademas usa
+# el servidor de desarrollo de Werkzeug.
+CMD HOST=0.0.0.0 python run.py
