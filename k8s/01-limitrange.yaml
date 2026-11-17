@@ -1,0 +1,21 @@
+# Valores por defecto de requests/limits para cualquier contenedor del
+# namespace que no los declare (p. ej. un pod de depuracion lanzado a mano).
+# Sin esto, un pod sin limites puede consumir todo el nodo.
+# Va antes que los Deployments (01) porque solo afecta a pods creados
+# DESPUES de existir.
+# No se fija "max" a proposito: el laboratorio api-gigante necesita pedir
+# mas CPU de la que existe para quedar Pending (con "max" seria rechazado).
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: valores-por-defecto
+  namespace: ingweb
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: 500m
+        memory: 256Mi

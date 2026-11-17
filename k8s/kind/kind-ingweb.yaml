@@ -1,0 +1,26 @@
+# Cluster kind para el laboratorio: 1 control-plane + 2 workers.
+# NO se aplica con kubectl (es configuracion de kind):
+#   kind create cluster --config k8s/kind/kind-ingweb.yaml
+# Va en una subcarpeta porque "kubectl apply -f k8s/" no es recursivo.
+#
+# 2 workers permiten demostrar el reparto de replicas entre nodos
+# (topologySpreadConstraints) y el drain respetando el PDB. Requiere ~8 GB
+# de RAM para Docker; con menos, deja un solo worker (se pierde la
+# demostracion de reparto entre nodos).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: ingweb
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # El Service web es NodePort 30080. kind corre los nodos como
+      # contenedores, asi que hay que publicar ese puerto al anfitrion.
+      # hostPort 8081 (no 8080) para poder tener Compose (8080) y el
+      # cluster levantados a la vez.
+      - containerPort: 30080
+        hostPort: 8081
+        # Solo desde este equipo, no desde la red local.
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+  - role: worker
+  - role: worker

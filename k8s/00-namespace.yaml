@@ -1,0 +1,14 @@
+# Namespace propio: aisla nombres, permite LimitRange/cuotas propias y se
+# borra todo de una vez (kubectl delete namespace ingweb).
+# Prefijo 00: "kubectl apply -f k8s/" aplica en orden alfabetico y el
+# namespace debe existir antes que lo demas.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingweb
+  labels:
+    app.kubernetes.io/part-of: ingweb
+    # Pod Security Admission: rechaza pods que pidan privilegios (root,
+    # hostPath, capabilities...). "restricted" es el perfil mas estricto.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
