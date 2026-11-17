@@ -1,0 +1,12 @@
+# Finales de linea LF para todo lo que se ejecuta o se lee dentro de Linux
+# (contenedores, WSL, kind). Con CRLF, bash falla con "$'\r': command not
+# found" y Nginx/YAML pueden interpretar mal los archivos.
+*.sh          text eol=lf
+*.mjs         text eol=lf
+*.py          text eol=lf
+*.conf        text eol=lf
+*.yaml        text eol=lf
+*.yml         text eol=lf
+Dockerfile*   text eol=lf
+.dockerignore text eol=lf
+*.dockerignore text eol=lf
