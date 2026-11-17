@@ -29,6 +29,7 @@ echo
 echo "Versiones vistas durante la actualizacion:"
 grep -o '"version":"[^"]*"' "$LOG" | sort | uniq -c
 echo "Peticiones OK:    $(grep -c ' OK ' "$LOG" || true)"
-echo "Peticiones FALLO: $(grep -c 'FALLO' "$LOG" || true)"
+echo "Peticiones FALLO: $(grep -c "FALLO codigo=" "$LOG" || true)"
+grep -B2 -A2 "FALLO codigo=" "$LOG" || true
 $K rollout history deployment/api | tail -4
 rm -f "$LOG"
